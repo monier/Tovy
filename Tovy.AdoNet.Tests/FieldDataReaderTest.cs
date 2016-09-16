@@ -9,12 +9,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Monier.Extensions.Tests.Mapping.AdoNet
+namespace Tovy.AdoNet.Tests
 {
     [TestClass]
     public class FieldDataReaderTest
     {
-        private const string Category = "Monier.Extensions.FieldAdoDataReader";
+        private const string Category = "Tovy.AdoNet";
 
         [TestMethod]
         [TestCategory(Category)]
