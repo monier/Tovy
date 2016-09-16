@@ -12,6 +12,14 @@ namespace Tovy
     public static class FieldMapper
     {
         /// <summary>
+        /// Object instance used to synchronize access to the mapper in a multithead context
+        /// </summary>
+        private static object _lockObj = new object();
+        /// <summary>
+        /// Cache of map infos of entities (POCO) to prevent retrieving in each mapping
+        /// </summary>
+        private static Dictionary<Type, Dictionary<string, FieldMapInfo>> _mapInfosCache = new Dictionary<Type, Dictionary<string, FieldMapInfo>>();
+        /// <summary>
         /// Maps the provided fields data to a list of entity
         /// </summary>
         /// <typeparam name="T">type of the entity</typeparam>
@@ -41,21 +49,29 @@ namespace Tovy
         /// </summary>
         /// <typeparam name="T">type of the entity</typeparam>
         /// <returns>dictionary that contains the mapping descriptions of the entity's properties and the [external] data source's fields</returns>
-        private static Dictionary<string,FieldMapInfo> GetEntityMapInfos<T>()
+        private static Dictionary<string, FieldMapInfo> GetEntityMapInfos<T>()
         {
-            Dictionary<string, FieldMapInfo> map = new Dictionary<string, FieldMapInfo>();
+            Dictionary<string, FieldMapInfo> map = null;
+
+            lock (_lockObj)
+            {
+                if (_mapInfosCache.TryGetValue(typeof(T), out map))
+                    return map;
+            }
+
             object[] attributes = null;
             FieldAttribute fieldAttribute = null;
             string fieldPrefix = null;
             string fieldName = null;
 
+            map = new Dictionary<string, FieldMapInfo>();
             var properties = typeof(T).GetProperties(BindingFlags.FlattenHierarchy | BindingFlags.Public | BindingFlags.Instance);
             if (properties != null)
             {
                 attributes = typeof(T).GetCustomAttributes(typeof(FieldPrefixAttribute), true);
                 if (attributes != null && attributes.Length > 0)
                     fieldPrefix = ((FieldPrefixAttribute)attributes.First()).Name;
-                foreach(var property in properties)
+                foreach (var property in properties)
                 {
                     attributes = property.GetCustomAttributes(typeof(FieldAttribute), true);
                     if (attributes != null && attributes.Length > 0)
