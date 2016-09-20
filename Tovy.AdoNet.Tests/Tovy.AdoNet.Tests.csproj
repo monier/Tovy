@@ -59,6 +59,10 @@
       <Project>{31b6ba40-00a7-4289-9e73-963e47753f16}</Project>
       <Name>Tovy.AdoNet</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Tovy.Extended\Tovy.Extended.csproj">
+      <Project>{21c245b8-493d-4fe4-b449-15978c516449}</Project>
+      <Name>Tovy.Extended</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Tovy\Tovy.csproj">
       <Project>{d86618b9-21b7-4a5e-b3ef-77446a7f156a}</Project>
       <Name>Tovy</Name>

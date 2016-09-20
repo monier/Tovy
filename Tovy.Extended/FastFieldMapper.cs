@@ -2,14 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace Tovy
+namespace Tovy.Extended
 {
     /// <summary>
     /// Service that maps any compatible data source fields to an entity having properties decorated with <see cref="FieldAttribute"/>.
+    /// <para>It doesn't always use pure reflection while mapping objects to faster operations.</para>
     /// </summary>
-    public class FieldMapper : IFieldMapper
+    public class FastFieldMapper : IFieldMapper
     {
         /// <summary>
         /// Object instance used to synchronize access to the mapper in a multithead context
@@ -19,6 +22,11 @@ namespace Tovy
         /// Cache of map infos of entities (POCO) to prevent retrieving in each mapping
         /// </summary>
         private Dictionary<Type, Dictionary<string, FieldMapInfo>> _mapInfosCache = new Dictionary<Type, Dictionary<string, FieldMapInfo>>();
+        
+        public FastFieldMapper()
+        {
+
+        }
         /// <summary>
         /// Maps the provided fields data to a list of entity
         /// </summary>
@@ -34,10 +42,10 @@ namespace Tovy
             while (dataReader.Read())
             {
                 entity = new T();
-                foreach(var mapInfo in mapInfos)
+                foreach (var mapInfo in mapInfos)
                 {
                     var value = dataReader.GetFieldValue(mapInfo.Key, mapInfo.Value.DefaultValueIfNull);
-                    mapInfo.Value.PropertyInfo.SetValue(entity, value, null);
+                    mapInfo.Value.SetPropertyValue(entity, value);
                 }
                 yield return entity;
             }
@@ -93,6 +101,7 @@ namespace Tovy
         /// </summary>
         private class FieldMapInfo
         {
+            private Action<object, object> _setPropertyDelegate = null;
             /// <summary>
             /// Field name from the [external] data source
             /// </summary>
@@ -105,6 +114,26 @@ namespace Tovy
             /// Entity's property's default value if field's value is null
             /// </summary>
             public object DefaultValueIfNull { get; set; }
+            /// <summary>
+            /// Set the property value of an object instance
+            /// </summary>
+            /// <param name="instance">instance of object</param>
+            /// <param name="value">value of the property</param>
+            public void SetPropertyValue(object instance, object value)
+            {
+                if (_setPropertyDelegate == null)
+                {
+                    DynamicMethod method = new DynamicMethod(string.Format("_dynamicSet_{0}", PropertyInfo.Name), typeof(void), new[] { typeof(object), typeof(object) }, true);
+                    var ilgen = method.GetILGenerator();
+                    ilgen.Emit(OpCodes.Ldarg_0);
+                    ilgen.Emit(OpCodes.Ldarg_1);
+                    ilgen.Emit(OpCodes.Callvirt, PropertyInfo.GetSetMethod());
+                    ilgen.Emit(OpCodes.Ret);
+                    _setPropertyDelegate = method.CreateDelegate(typeof(Action<object, object>)) as Action<object, object>;
+                }
+                _setPropertyDelegate(instance, value);
+                //PropertyInfo.SetValue(instance, value);
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Tovy.Extended;
 
 namespace Tovy.AdoNet.Tests
 {
@@ -16,6 +17,8 @@ namespace Tovy.AdoNet.Tests
     {
         private const string Category = "Tovy.AdoNet";
 
+        public TestContext TestContext { get; set; }
+
         [TestMethod]
         [TestCategory(Category)]
         public void Map()
@@ -23,6 +26,7 @@ namespace Tovy.AdoNet.Tests
             DataTable dt = new DataTable();
             DataRow row = null;
             IDataReader dataReader = null;
+            IFieldMapper fieldMapper = new FieldMapper();
 
             dt.Columns.Add(new DataColumn("id", typeof(int)));
             dt.Columns.Add(new DataColumn("name", typeof(string)));
@@ -39,7 +43,7 @@ namespace Tovy.AdoNet.Tests
             row["prop01"] = 2;
             dt.Rows.Add(row);
             dataReader = dt.CreateDataReader();
-            var entities = FieldMapper.Map<MyEntity01>(new FieldDataReader(dataReader)).ToList();
+            var entities = fieldMapper.Map<MyEntity01>(new FieldDataReader(dataReader)).ToList();
             Assert.IsTrue(entities.Count == 2, "All entities are created");
             Assert.IsTrue(entities[0].Id == 5, "Field mapping of int is correct");
             Assert.IsTrue(entities[0].Name == "idIs5", "Field mapping of string is correct");
@@ -59,6 +63,7 @@ namespace Tovy.AdoNet.Tests
             DataTable dt = new DataTable();
             DataRow row = null;
             IDataReader dataReader = null;
+            IFieldMapper fieldMapper = new FieldMapper();
 
             dt.Columns.Add(new DataColumn("pref.id", typeof(int)));
             dt.Columns.Add(new DataColumn("pref.name", typeof(string)));
@@ -70,10 +75,82 @@ namespace Tovy.AdoNet.Tests
             row["pref.prop01"] = DBNull.Value;
             dt.Rows.Add(row);
             dataReader = dt.CreateDataReader();
-            var entities = FieldMapper.Map<MyEntity02>(new FieldDataReader(dataReader)).ToList();
+            var entities = fieldMapper.Map<MyEntity02>(new FieldDataReader(dataReader)).ToList();
             Assert.IsTrue(entities.Count == 1, "Entity is created");
             Assert.IsTrue(entities[0].Id == 5, "Int field with prefix is succesfully mapped");
             Assert.IsTrue(entities[0].Name == "idIs5", "String field with prefix is succesfully mapped");
+        }
+
+        [TestMethod]
+        [TestCategory(Category)]
+        public void MapMassive()
+        {
+            DataTable dt = new DataTable();
+            IDataReader dataReader = null;
+            DataRow row = null;
+            IFieldMapper fieldMapper = new FieldMapper();
+
+            dt.Columns.Add(new DataColumn("id", typeof(int)));
+            dt.Columns.Add(new DataColumn("name", typeof(string)));
+            dt.Columns.Add(new DataColumn("prop01", typeof(int)));
+            dt.Columns.Add(new DataColumn("unset"));
+
+            for(int i = 0; i <= 5000; i++)
+            {
+                row = dt.NewRow();
+                row["id"] = i;
+                row["name"] = string.Format("name_{0}", i);
+                row["prop01"] = i % 2;
+                dt.Rows.Add(row);
+            }
+            dataReader = dt.CreateDataReader();
+            Stopwatch watch = new Stopwatch();
+            watch.Start();
+            var entities = fieldMapper.Map<MyEntity01>(new FieldDataReader(dataReader)).ToList();
+            watch.Stop();
+            TestContext.WriteLine("Elapsed: {0}", watch.ElapsedMilliseconds);
+        }
+
+        [TestMethod]
+        [TestCategory(Category)]
+        public void MassiveComparePortableAndExtended()
+        {
+            DataTable dt = new DataTable();
+            DataRow row = null;
+            IFieldMapper fieldMapper = null;
+
+            dt.Columns.Add(new DataColumn("id", typeof(int)));
+            dt.Columns.Add(new DataColumn("name", typeof(string)));
+            dt.Columns.Add(new DataColumn("prop01", typeof(int)));
+            dt.Columns.Add(new DataColumn("unset"));
+
+            for (int i = 0; i <= 5000; i++)
+            {
+                row = dt.NewRow();
+                row["id"] = i;
+                row["name"] = string.Format("name_{0}", i);
+                row["prop01"] = i % 2;
+                dt.Rows.Add(row);
+            }
+            using (IDataReader dataReader = dt.CreateDataReader())
+            {
+                fieldMapper = new FieldMapper();
+                Stopwatch watchPortable = new Stopwatch();
+                watchPortable.Start();
+                var entitiesPortable = fieldMapper.Map<MyEntity01>(new FieldDataReader(dataReader)).ToList();
+                watchPortable.Stop();
+                TestContext.WriteLine("Elapsed Portable: {0}", watchPortable.ElapsedMilliseconds);
+            }
+
+            using (IDataReader dataReader = dt.CreateDataReader())
+            {
+                fieldMapper = new FastFieldMapper();
+                Stopwatch watchExtended = new Stopwatch();
+                watchExtended.Start();
+                var entitiesExtended = fieldMapper.Map<MyEntity01>(new FieldDataReader(dataReader)).ToList();
+                watchExtended.Stop();
+                TestContext.WriteLine("Elapsed Extended: {0}", watchExtended.ElapsedMilliseconds);
+            }
         }
 
         private class MyEntity01
